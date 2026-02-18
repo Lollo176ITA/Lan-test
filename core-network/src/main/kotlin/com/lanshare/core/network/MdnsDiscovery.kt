@@ -30,6 +30,9 @@ class MdnsDiscovery(
                     val name = info.getPropertyString("name") ?: "LanShare Host"
                     val version = info.getPropertyString("version") ?: "unknown"
                     val fingerprintShort = info.getPropertyString("fingerprintShort") ?: ""
+                    val txtAddress = info.getPropertyString("address")?.takeIf { it.isNotBlank() }
+                    val discoveredAddress = info.inet4Addresses.firstOrNull()?.hostAddress
+                        ?: info.inetAddresses.firstOrNull()?.hostAddress
 
                     announcements[hostId] = HostAnnouncement(
                         hostId = hostId,
@@ -37,8 +40,7 @@ class MdnsDiscovery(
                         apiPort = info.port,
                         version = version,
                         fingerprintShort = fingerprintShort,
-                        address = info.inet4Addresses.firstOrNull()?.hostAddress
-                            ?: info.inetAddresses.firstOrNull()?.hostAddress
+                        address = txtAddress ?: discoveredAddress
                     )
                 }
             }

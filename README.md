@@ -51,6 +51,6 @@ On this stack, Gradle can still report one Kotlin plugin compatibility warning w
 GitHub Actions workflow `/Users/lorenzo/Projects/Lan-test/.github/workflows/build-executables.yml` builds and uploads:
 
 - macOS `.dmg`
-- Windows `.msi` + `.exe` portable (con app-image completo)
+- Windows `.msi` e `.exe` in artifact separati (download piu leggero)
 - Linux `.deb`
 - Android `.apk`

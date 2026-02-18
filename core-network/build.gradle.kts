@@ -19,6 +19,7 @@ dependencies {
     implementation("io.ktor:ktor-network-tls-certificates:2.3.12")
     implementation("io.ktor:ktor-client-core:2.3.12")
     implementation("io.ktor:ktor-client-cio:2.3.12")
+    implementation("io.ktor:ktor-client-okhttp:2.3.12")
     implementation("io.ktor:ktor-client-content-negotiation:2.3.12")
 
     implementation("org.jmdns:jmdns:3.5.8")

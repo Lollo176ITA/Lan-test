@@ -20,7 +20,7 @@ import com.lanshare.core.api.model.TransferManifest
 import com.lanshare.core.api.model.TransferResume
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
-import io.ktor.client.engine.cio.CIO
+import io.ktor.client.engine.okhttp.OkHttp
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.defaultRequest
 import io.ktor.client.request.bearerAuth
@@ -33,7 +33,10 @@ import io.ktor.http.ContentType
 import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.serialization.json.Json
+import java.security.SecureRandom
 import java.security.cert.X509Certificate
+import javax.net.ssl.SSLContext
+import javax.net.ssl.TrustManager
 import javax.net.ssl.X509TrustManager
 
 class LanShareClient(
@@ -48,10 +51,15 @@ class LanShareClient(
         override fun checkServerTrusted(chain: Array<X509Certificate>, authType: String) = Unit
     }
 
-    private val client = HttpClient(CIO) {
+    private val sslContext = SSLContext.getInstance("TLS").apply {
+        init(null, arrayOf<TrustManager>(trustAll), SecureRandom())
+    }
+
+    private val client = HttpClient(OkHttp) {
         engine {
-            https {
-                trustManager = trustAll
+            config {
+                sslSocketFactory(sslContext.socketFactory, trustAll)
+                hostnameVerifier { _, _ -> true }
             }
         }
 

@@ -56,7 +56,6 @@ class MainViewModel {
 
             Files.createDirectories(appDataDir)
             val localConfig = LanShareConfig(
-                hostName = "LanShare-${UUID.randomUUID().toString().take(4)}",
                 storageRoot = appDataDir.resolve("host")
             )
             val localServer = LanShareServer(

@@ -23,7 +23,7 @@ private fun defaultLanAdvertisedHost(): String {
         Collections.list(interfaces)
             .asSequence()
             .filter {
-                runCatching { it.isUp && !it.isLoopback && !it.isVirtual }
+                runCatching { it.isUp && !it.isLoopback && !it.isVirtual && it.supportsMulticast() }
                     .getOrDefault(false)
             }
             .flatMap { network -> Collections.list(network.inetAddresses).asSequence() }
