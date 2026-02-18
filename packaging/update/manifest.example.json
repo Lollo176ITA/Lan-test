@@ -1,0 +1,22 @@
+{
+  "latestVersion": "0.1.0",
+  "channels": {
+    "stable": {
+      "macos-aarch64": {
+        "url": "https://updates.example.com/LanShare-0.1.0-macos-aarch64.zip",
+        "sha256": "<sha256>",
+        "signature": "<detached-signature>"
+      },
+      "windows-x64": {
+        "url": "https://updates.example.com/LanShare-0.1.0-windows-x64.zip",
+        "sha256": "<sha256>",
+        "signature": "<detached-signature>"
+      },
+      "linux-x64": {
+        "url": "https://updates.example.com/LanShare-0.1.0-linux-x64.zip",
+        "sha256": "<sha256>",
+        "signature": "<detached-signature>"
+      }
+    }
+  }
+}
