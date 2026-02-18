@@ -123,9 +123,9 @@ class MainViewModel {
 
     fun connectToHost(baseUrl: String, hostId: String, deviceName: String) {
         scope.launch {
-            if (hostId.isBlank()) {
+            if (baseUrl.isBlank()) {
                 _uiState.update {
-                    it.copy(blockingWarning = "Inserisci hostId prima di connetterti")
+                    it.copy(blockingWarning = "Inserisci Base URL prima di connetterti")
                 }
                 return@launch
             }
@@ -138,13 +138,14 @@ class MainViewModel {
                 val newClient = LanShareClient(baseUrl)
                 val join = newClient.join(
                     JoinRequest(
-                        hostId = hostId,
+                        hostId = hostId.ifBlank { "auto" },
                         deviceName = deviceName.ifBlank { "Desktop Client" },
                         devicePublicKey = "not-used-yet"
                     )
                 )
 
-                val trusted = trustedHostStore.get(hostId)
+                val trustKey = hostId.ifBlank { baseUrl }
+                val trusted = trustedHostStore.get(trustKey)
                 if (trusted != null && trusted.fingerprint != join.hostFingerprint) {
                     _uiState.update {
                         it.copy(
@@ -158,7 +159,7 @@ class MainViewModel {
                     return@launch
                 }
 
-                trustedHostStore.save(hostId, join.hostFingerprint)
+                trustedHostStore.save(trustKey, join.hostFingerprint)
                 client = newClient
                 sessionToken = join.sessionToken
 
@@ -167,12 +168,12 @@ class MainViewModel {
                         connected = true,
                         sessionToken = join.sessionToken,
                         blockingWarning = null,
-                        connectedHostId = hostId,
+                        connectedHostId = hostId.ifBlank { "auto" },
                         connectedBaseUrl = baseUrl,
                         connectedDevices = emptyList()
                     )
                 }
-                appendLog("Connesso all'host $hostId")
+                appendLog("Connesso all'host ${hostId.ifBlank { "auto" }}")
                 refreshConnectedDevices()
                 startDevicePolling()
             } catch (exception: Exception) {
@@ -573,9 +574,16 @@ class MainViewModel {
         runCatching {
             MdnsDiscovery().discover(1_200)
         }.onSuccess { hosts ->
-            _uiState.update { it.copy(discoveredHosts = hosts) }
+            val localId = _uiState.value.localHostId
+            val remoteHosts = if (localId.isBlank()) {
+                hosts
+            } else {
+                hosts.filterNot { host -> host.hostId == localId }
+            }
+
+            _uiState.update { it.copy(discoveredHosts = remoteHosts) }
             if (showLog) {
-                appendLog("Trovati ${hosts.size} host in LAN")
+                appendLog("Trovati ${remoteHosts.size} host remoti in LAN (${hosts.size} totali)")
             }
         }.onFailure { exception ->
             if (showLog) {

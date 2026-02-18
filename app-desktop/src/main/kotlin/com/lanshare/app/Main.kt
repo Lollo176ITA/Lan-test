@@ -7,18 +7,25 @@ import androidx.compose.ui.window.application
 import com.lanshare.app.ui.LanShareApp
 import com.lanshare.app.viewmodel.MainViewModel
 
-fun main() = application {
-    val viewModel = remember { MainViewModel() }
+fun main(args: Array<String>) {
+    if (args.any { it == "--self-check" }) {
+        println("LanShare self-check OK")
+        return
+    }
 
-    Window(
-        onCloseRequest = {
-            viewModel.shutdown()
-            exitApplication()
-        },
-        title = "LanShare Desktop"
-    ) {
-        MaterialTheme {
-            LanShareApp(viewModel)
+    application {
+        val viewModel = remember { MainViewModel() }
+
+        Window(
+            onCloseRequest = {
+                viewModel.shutdown()
+                exitApplication()
+            },
+            title = "LanShare Desktop"
+        ) {
+            MaterialTheme {
+                LanShareApp(viewModel)
+            }
         }
     }
 }

@@ -27,9 +27,11 @@ compose.desktop {
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
             packageName = "LanShare"
-            packageVersion = "1.0.0"
+            packageVersion = project.version.toString()
             description = "LAN desktop sharing and streaming"
             vendor = "LanShare"
+            // Reduce runtime-missing startup issues on packaged Windows builds.
+            includeAllModules = true
         }
     }
 }

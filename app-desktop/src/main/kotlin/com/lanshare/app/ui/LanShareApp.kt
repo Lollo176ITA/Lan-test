@@ -123,7 +123,10 @@ fun LanShareApp(viewModel: MainViewModel) {
                         Text("Usa Host Locale")
                     }
                 }
-                Text("Host trovati: ${state.discoveredHosts.size}")
+                Text("Host remoti trovati: ${state.discoveredHosts.size}")
+                if (state.discoveredHosts.isEmpty()) {
+                    Text("Nessun host remoto trovato. Avvia un host su un altro dispositivo in LAN.")
+                }
 
                 state.discoveredHosts.forEach { host ->
                     Row(
@@ -178,7 +181,7 @@ fun LanShareApp(viewModel: MainViewModel) {
                     value = hostId,
                     onValueChange = { hostId = it },
                     modifier = Modifier.fillMaxWidth(),
-                    label = { Text("Host ID") }
+                    label = { Text("Host ID (opzionale)") }
                 )
                 OutlinedTextField(
                     value = deviceName,

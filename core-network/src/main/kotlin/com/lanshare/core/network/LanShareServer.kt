@@ -57,7 +57,10 @@ class LanShareServer(
     private val updateService = UpdateService(config.appVersion)
     private val eventHub = EventHub(json)
 
-    private val mdnsPublisher = MdnsPublisher(serviceName = "LanShare-${config.hostId.take(8)}")
+    private val mdnsPublisher = MdnsPublisher(
+        serviceName = "LanShare-${config.hostId.take(8)}",
+        bindAddress = config.advertisedHost
+    )
 
     @Volatile
     private var server: ApplicationEngine? = null

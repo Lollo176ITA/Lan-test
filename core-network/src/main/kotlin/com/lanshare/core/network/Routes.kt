@@ -74,14 +74,6 @@ fun Application.installLanShareModule(context: ServerContext) {
                     return@post
                 }
 
-                if (request.hostId != context.config.hostId) {
-                    call.respond(
-                        HttpStatusCode.BadRequest,
-                        ErrorEnvelope("JOIN_HOST_MISMATCH", "HostId non valido", retryable = false)
-                    )
-                    return@post
-                }
-
                 val clientIp = call.request.local.remoteHost
                 val (token, device) = context.deviceRegistry.registerClient(request.deviceName, clientIp)
                 val response = JoinResponse(
