@@ -27,11 +27,17 @@ compose.desktop {
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
             packageName = "LanShare"
-            packageVersion = project.version.toString()
+            // DMG packaging rejects 0.x.y (major must be > 0), keep native installer version >= 1.
+            packageVersion = "1.0.0"
             description = "LAN desktop sharing and streaming"
             vendor = "LanShare"
             // Reduce runtime-missing startup issues on packaged Windows builds.
             includeAllModules = true
+
+            macOS {
+                packageVersion = "1.0.0"
+                dmgPackageVersion = "1.0.0"
+            }
         }
     }
 }
