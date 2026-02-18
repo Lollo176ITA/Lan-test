@@ -18,6 +18,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -33,6 +34,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.lanshare.app.viewmodel.MainViewModel
+import java.nio.file.Path
+import javax.swing.JFileChooser
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -45,8 +48,15 @@ fun LanShareApp(viewModel: MainViewModel) {
     var deviceName by remember { mutableStateOf("Desktop Client") }
 
     LaunchedEffect(state.discoveredHosts) {
-        if (hostId.isBlank() && state.discoveredHosts.size == 1) {
-            hostId = state.discoveredHosts.first().hostId
+        if (state.discoveredHosts.size == 1) {
+            val host = state.discoveredHosts.first()
+            if (hostId.isBlank()) {
+                hostId = host.hostId
+            }
+            if (baseUrl == "https://localhost:8443" || baseUrl.isBlank()) {
+                val hostAddress = host.address ?: "localhost"
+                baseUrl = "https://$hostAddress:${host.apiPort}"
+            }
         }
     }
 
@@ -83,22 +93,53 @@ fun LanShareApp(viewModel: MainViewModel) {
                     }
                 }
 
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Auto-discovery")
+                    Switch(
+                        checked = state.autoDiscoveryEnabled,
+                        onCheckedChange = { viewModel.setAutoDiscovery(it) }
+                    )
+                }
+
                 Text("PIN: ${if (state.hostPin.isBlank()) "-" else state.hostPin}")
                 Text("Fingerprint: ${if (state.hostFingerprint.isBlank()) "-" else state.hostFingerprint}")
                 Text("Host trovati: ${state.discoveredHosts.size}")
+
                 state.discoveredHosts.forEach { host ->
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("${host.name} - id=${host.hostId.take(8)}... - porta=${host.apiPort}")
-                        OutlinedButton(
-                            onClick = {
-                                hostId = host.hostId
-                                val hostAddress = host.address ?: "localhost"
-                                baseUrl = "https://$hostAddress:${host.apiPort}"
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column {
+                            Text("${host.name} - id=${host.hostId.take(8)}...")
+                            val address = host.address ?: "localhost"
+                            Text("$address:${host.apiPort}")
+                        }
+
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            OutlinedButton(
+                                onClick = {
+                                    hostId = host.hostId
+                                    val hostAddress = host.address ?: "localhost"
+                                    baseUrl = "https://$hostAddress:${host.apiPort}"
+                                }
+                            ) {
+                                Text("Usa")
                             }
-                        ) {
-                            Text("Usa")
+
+                            Button(
+                                onClick = {
+                                    hostId = host.hostId
+                                    val hostAddress = host.address ?: "localhost"
+                                    baseUrl = "https://$hostAddress:${host.apiPort}"
+                                    viewModel.quickConnect(host, pin, deviceName)
+                                }
+                            ) {
+                                Text("Connetti")
+                            }
                         }
                     }
+                    HorizontalDivider()
                 }
             }
         }
@@ -133,19 +174,35 @@ fun LanShareApp(viewModel: MainViewModel) {
                 )
 
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(
-                        onClick = { viewModel.connectToHost(baseUrl, hostId, pin, deviceName) }
-                    ) {
-                        Text("Connetti")
+                    if (state.connected) {
+                        OutlinedButton(onClick = { viewModel.disconnectClient() }) {
+                            Text("Disconnetti")
+                        }
+                    } else {
+                        Button(onClick = { viewModel.connectToHost(baseUrl, hostId, pin, deviceName) }) {
+                            Text("Connetti")
+                        }
                     }
 
-                    OutlinedButton(onClick = { viewModel.uploadQueuedFiles() }) {
-                        Text("Invia Coda")
+                    OutlinedButton(
+                        onClick = { viewModel.uploadQueuedFiles() },
+                        enabled = state.connected && !state.uploadInProgress
+                    ) {
+                        Text(if (state.uploadInProgress) "Upload in corso" else "Invia Coda")
+                    }
+
+                    OutlinedButton(
+                        onClick = { viewModel.refreshConnectedDevices() },
+                        enabled = state.connected
+                    ) {
+                        Text("Aggiorna dispositivi")
                     }
                 }
 
                 Text("Connesso: ${if (state.connected) "SI" else "NO"}")
                 if (state.connected) {
+                    Text("Host: ${state.connectedHostId.take(8)}...")
+                    Text("URL: ${state.connectedBaseUrl}")
                     Text("Sessione: ${state.sessionToken.take(12)}...")
                 }
             }
@@ -171,6 +228,18 @@ fun LanShareApp(viewModel: MainViewModel) {
         Card(modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("Drag & Drop", fontWeight = FontWeight.SemiBold)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(
+                        onClick = {
+                            val picked = pickFilesOrDirectoriesFromDialog()
+                            if (picked.isNotEmpty()) {
+                                viewModel.onFilesDropped(picked)
+                            }
+                        }
+                    ) {
+                        Text("Aggiungi file/cartelle")
+                    }
+                }
                 SwingPanel(
                     modifier = Modifier.fillMaxWidth().height(130.dp),
                     factory = {
@@ -185,20 +254,55 @@ fun LanShareApp(viewModel: MainViewModel) {
         Card(modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("Coda Trasferimenti", fontWeight = FontWeight.SemiBold)
+
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(onClick = { viewModel.retryFailedQueue() }) {
+                        Text("Riprova errori")
+                    }
+                    OutlinedButton(onClick = { viewModel.clearCompletedQueue() }) {
+                        Text("Pulisci completati")
+                    }
+                }
+
                 if (state.transferQueue.isEmpty()) {
                     Text("Nessun file in coda")
                 }
 
                 state.transferQueue.forEach { item ->
                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text(item.fileName)
-                        Text("${humanSize(item.sizeBytes)} - ${item.status}")
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column {
+                                Text(item.fileName)
+                                Text("${humanSize(item.sizeBytes)} - ${item.status}")
+                            }
+                            TextButton(onClick = { viewModel.removeQueueItem(item.localId) }) {
+                                Text("Rimuovi")
+                            }
+                        }
+
                         LinearProgressIndicator(
                             progress = { item.progress.toFloat() },
                             modifier = Modifier.fillMaxWidth()
                         )
                     }
                     HorizontalDivider()
+                }
+            }
+        }
+
+        if (state.connected) {
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text("Dispositivi Connessi", fontWeight = FontWeight.SemiBold)
+                    if (state.connectedDevices.isEmpty()) {
+                        Text("Nessun dispositivo disponibile")
+                    }
+                    state.connectedDevices.forEach { device ->
+                        Text("${device.deviceName} (${device.role}) - ${device.ipAddress} - ${device.status}")
+                    }
                 }
             }
         }
@@ -231,4 +335,23 @@ private fun humanSize(size: Long): String {
     }
     val gb = mb / 1024.0
     return "%.2f GB".format(gb)
+}
+
+private fun pickFilesOrDirectoriesFromDialog(): List<Path> {
+    val chooser = JFileChooser().apply {
+        fileSelectionMode = JFileChooser.FILES_AND_DIRECTORIES
+        isMultiSelectionEnabled = true
+        dialogTitle = "Seleziona file o cartelle"
+    }
+
+    val result = chooser.showOpenDialog(null)
+    if (result != JFileChooser.APPROVE_OPTION) {
+        return emptyList()
+    }
+
+    val selected = chooser.selectedFiles?.toList().orEmpty().ifEmpty {
+        chooser.selectedFile?.let { listOf(it) } ?: emptyList()
+    }
+
+    return selected.map { it.toPath() }
 }

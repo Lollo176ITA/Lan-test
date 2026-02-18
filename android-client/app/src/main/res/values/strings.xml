@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">LanShare Android</string>
+    <string name="welcome_message">LanShare Android build artifact</string>
+</resources>

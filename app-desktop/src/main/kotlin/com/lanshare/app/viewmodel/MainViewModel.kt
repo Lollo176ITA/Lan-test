@@ -1,6 +1,7 @@
 package com.lanshare.app.viewmodel
 
 import com.lanshare.core.api.model.CreateTransferRequest
+import com.lanshare.core.api.model.DeviceInfo
 import com.lanshare.core.api.model.HostAnnouncement
 import com.lanshare.core.api.model.JoinRequest
 import com.lanshare.core.network.LanShareClient
@@ -11,12 +12,15 @@ import com.lanshare.core.network.TrustedHostStore
 import com.lanshare.core.transfer.Hashing
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.nio.file.Files
 import java.nio.file.Path
@@ -33,6 +37,8 @@ class MainViewModel {
     private var server: LanShareServer? = null
     private var client: LanShareClient? = null
     private var sessionToken: String? = null
+    private var discoveryJob: Job? = null
+    private var devicePollingJob: Job? = null
     @Volatile
     private var uploadInProgress: Boolean = false
 
@@ -83,13 +89,28 @@ class MainViewModel {
 
     fun discoverHosts() {
         scope.launch {
-            try {
-                val hosts = MdnsDiscovery().discover(1_200)
-                _uiState.update { it.copy(discoveredHosts = hosts) }
-                appendLog("Trovati ${hosts.size} host in LAN")
-            } catch (exception: Exception) {
-                appendLog("Errore discovery: ${exception.message}")
+            discoverHostsInternal(showLog = true)
+        }
+    }
+
+    fun setAutoDiscovery(enabled: Boolean) {
+        if (enabled) {
+            if (discoveryJob?.isActive == true) {
+                return
             }
+            _uiState.update { it.copy(autoDiscoveryEnabled = true) }
+            discoveryJob = scope.launch {
+                while (isActive) {
+                    discoverHostsInternal(showLog = false)
+                    delay(5_000)
+                }
+            }
+            appendLog("Auto-discovery attivata")
+        } else {
+            discoveryJob?.cancel()
+            discoveryJob = null
+            _uiState.update { it.copy(autoDiscoveryEnabled = false) }
+            appendLog("Auto-discovery disattivata")
         }
     }
 
@@ -103,6 +124,8 @@ class MainViewModel {
             }
 
             try {
+                devicePollingJob?.cancel()
+                devicePollingJob = null
                 client?.close()
                 val newClient = LanShareClient(baseUrl)
                 val join = newClient.join(
@@ -138,10 +161,13 @@ class MainViewModel {
                         sessionToken = join.sessionToken,
                         blockingWarning = null,
                         connectedHostId = hostId,
-                        connectedBaseUrl = baseUrl
+                        connectedBaseUrl = baseUrl,
+                        connectedDevices = emptyList()
                     )
                 }
                 appendLog("Connesso all'host $hostId")
+                refreshConnectedDevices()
+                startDevicePolling()
             } catch (exception: Exception) {
                 _uiState.update {
                     it.copy(
@@ -152,6 +178,38 @@ class MainViewModel {
                 }
                 appendLog("Join fallita: ${exception.message}")
             }
+        }
+    }
+
+    fun quickConnect(host: HostAnnouncement, pin: String, deviceName: String) {
+        val hostAddress = host.address ?: "localhost"
+        val baseUrl = "https://$hostAddress:${host.apiPort}"
+        connectToHost(baseUrl, host.hostId, pin, deviceName)
+    }
+
+    fun disconnectClient() {
+        scope.launch {
+            devicePollingJob?.cancel()
+            devicePollingJob = null
+            client?.close()
+            client = null
+            sessionToken = null
+            _uiState.update {
+                it.copy(
+                    connected = false,
+                    sessionToken = "",
+                    connectedHostId = "",
+                    connectedBaseUrl = "",
+                    connectedDevices = emptyList()
+                )
+            }
+            appendLog("Client disconnesso")
+        }
+    }
+
+    fun refreshConnectedDevices() {
+        scope.launch {
+            refreshConnectedDevicesInternal(showLogOnError = true)
         }
     }
 
@@ -199,6 +257,7 @@ class MainViewModel {
             return
         }
         uploadInProgress = true
+        _uiState.update { it.copy(uploadInProgress = true) }
         try {
             val api = client
             val token = sessionToken
@@ -267,6 +326,36 @@ class MainViewModel {
             }
         } finally {
             uploadInProgress = false
+            _uiState.update { it.copy(uploadInProgress = false) }
+        }
+    }
+
+    fun clearCompletedQueue() {
+        _uiState.update { state ->
+            state.copy(
+                transferQueue = state.transferQueue.filterNot { it.status == "Completato" }
+            )
+        }
+    }
+
+    fun retryFailedQueue() {
+        _uiState.update { state ->
+            state.copy(
+                transferQueue = state.transferQueue.map { item ->
+                    if (item.status.startsWith("Errore")) {
+                        item.copy(status = "In coda", progress = 0.0)
+                    } else {
+                        item
+                    }
+                }
+            )
+        }
+        appendLog("Elementi in errore rimessi in coda")
+    }
+
+    fun removeQueueItem(localId: String) {
+        _uiState.update { state ->
+            state.copy(transferQueue = state.transferQueue.filterNot { it.localId == localId })
         }
     }
 
@@ -275,9 +364,54 @@ class MainViewModel {
     }
 
     fun shutdown() {
+        discoveryJob?.cancel()
+        devicePollingJob?.cancel()
         client?.close()
         server?.stop()
         scope.cancel()
+    }
+
+    private suspend fun discoverHostsInternal(showLog: Boolean) {
+        runCatching {
+            MdnsDiscovery().discover(1_200)
+        }.onSuccess { hosts ->
+            _uiState.update { it.copy(discoveredHosts = hosts) }
+            if (showLog) {
+                appendLog("Trovati ${hosts.size} host in LAN")
+            }
+        }.onFailure { exception ->
+            if (showLog) {
+                appendLog("Errore discovery: ${exception.message}")
+            }
+        }
+    }
+
+    private fun startDevicePolling() {
+        devicePollingJob?.cancel()
+        devicePollingJob = scope.launch {
+            while (isActive) {
+                refreshConnectedDevicesInternal(showLogOnError = false)
+                delay(5_000)
+            }
+        }
+    }
+
+    private suspend fun refreshConnectedDevicesInternal(showLogOnError: Boolean) {
+        val api = client
+        val token = sessionToken
+        if (api == null || token.isNullOrBlank()) {
+            return
+        }
+
+        runCatching {
+            api.devices(token)
+        }.onSuccess { devices ->
+            _uiState.update { it.copy(connectedDevices = devices) }
+        }.onFailure { error ->
+            if (showLogOnError) {
+                appendLog("Errore aggiornamento dispositivi: ${error.message}")
+            }
+        }
     }
 
     private fun appendLog(message: String) {
@@ -329,11 +463,14 @@ data class AppUiState(
     val hostRunning: Boolean = false,
     val hostPin: String = "",
     val hostFingerprint: String = "",
+    val autoDiscoveryEnabled: Boolean = false,
     val discoveredHosts: List<HostAnnouncement> = emptyList(),
     val connected: Boolean = false,
     val sessionToken: String = "",
     val connectedHostId: String = "",
     val connectedBaseUrl: String = "",
+    val connectedDevices: List<DeviceInfo> = emptyList(),
+    val uploadInProgress: Boolean = false,
     val blockingWarning: String? = null,
     val transferQueue: List<TransferQueueItem> = emptyList(),
     val logs: List<String> = emptyList()
