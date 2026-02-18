@@ -25,7 +25,7 @@ compose.desktop {
         mainClass = "com.lanshare.app.MainKt"
 
         nativeDistributions {
-            targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
+            targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Exe, TargetFormat.Deb)
             packageName = "LanShare"
             // DMG packaging rejects 0.x.y (major must be > 0), keep native installer version >= 1.
             packageVersion = "1.0.0"
