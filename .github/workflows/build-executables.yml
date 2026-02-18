@@ -57,8 +57,9 @@ jobs:
         run: |
           $exe = "app-desktop/build/compose/binaries/main/app/LanShare/LanShare.exe"
           if (!(Test-Path $exe)) { throw "Launcher not found: $exe" }
-          & $exe --self-check
-          if ($LASTEXITCODE -ne 0) { throw "Self-check failed with exit code $LASTEXITCODE" }
+          $proc = Start-Process -FilePath $exe -ArgumentList "--self-check" -Wait -PassThru
+          if ($null -eq $proc.ExitCode) { throw "Self-check did not return an exit code" }
+          if ($proc.ExitCode -ne 0) { throw "Self-check failed with exit code $($proc.ExitCode)" }
 
       - name: Upload desktop artifact
         uses: actions/upload-artifact@v4
