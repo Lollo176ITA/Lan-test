@@ -51,7 +51,6 @@ data class HostAnnouncement(
 @Serializable
 data class JoinRequest(
     val hostId: String,
-    val pin: String,
     val deviceName: String,
     val devicePublicKey: String
 )

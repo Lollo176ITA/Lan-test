@@ -82,22 +82,6 @@ fun Application.installLanShareModule(context: ServerContext) {
                     return@post
                 }
 
-                if (request.pin.length != 6 || request.pin.any { !it.isDigit() }) {
-                    call.respond(
-                        HttpStatusCode.BadRequest,
-                        ErrorEnvelope("JOIN_PIN_FORMAT", "PIN deve avere 6 cifre", retryable = true)
-                    )
-                    return@post
-                }
-
-                if (!context.pinManager.validate(request.pin)) {
-                    call.respond(
-                        HttpStatusCode.Unauthorized,
-                        ErrorEnvelope("JOIN_INVALID_PIN", "PIN non valido", retryable = true)
-                    )
-                    return@post
-                }
-
                 val clientIp = call.request.local.remoteHost
                 val (token, device) = context.deviceRegistry.registerClient(request.deviceName, clientIp)
                 val response = JoinResponse(

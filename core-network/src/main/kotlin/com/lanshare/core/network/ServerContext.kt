@@ -11,7 +11,6 @@ data class ServerContext(
     val config: LanShareConfig,
     val json: Json,
     val tlsMaterial: TlsMaterial,
-    val pinManager: PinManager,
     val deviceRegistry: DeviceRegistry,
     val trustedHostStore: TrustedHostStore,
     val transferCoordinator: TransferCoordinator,

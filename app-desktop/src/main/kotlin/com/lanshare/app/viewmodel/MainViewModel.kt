@@ -4,6 +4,10 @@ import com.lanshare.core.api.model.CreateTransferRequest
 import com.lanshare.core.api.model.DeviceInfo
 import com.lanshare.core.api.model.HostAnnouncement
 import com.lanshare.core.api.model.JoinRequest
+import com.lanshare.core.api.model.LiveStartRequest
+import com.lanshare.core.api.model.PlaybackMode
+import com.lanshare.core.api.model.SyncPairRequest
+import com.lanshare.core.api.model.SyncScanRequest
 import com.lanshare.core.network.LanShareClient
 import com.lanshare.core.network.LanShareConfig
 import com.lanshare.core.network.LanShareServer
@@ -39,6 +43,7 @@ class MainViewModel {
     private var sessionToken: String? = null
     private var discoveryJob: Job? = null
     private var devicePollingJob: Job? = null
+
     @Volatile
     private var uploadInProgress: Boolean = false
 
@@ -50,12 +55,12 @@ class MainViewModel {
             }
 
             Files.createDirectories(appDataDir)
+            val localConfig = LanShareConfig(
+                hostName = "LanShare-${UUID.randomUUID().toString().take(4)}",
+                storageRoot = appDataDir.resolve("host")
+            )
             val localServer = LanShareServer(
-                LanShareConfig(
-                    hostName = "LanShare-${UUID.randomUUID().toString().take(4)}",
-                    advertisedHost = "localhost",
-                    storageRoot = appDataDir.resolve("host")
-                )
+                localConfig
             )
 
             localServer.start(wait = false)
@@ -64,11 +69,12 @@ class MainViewModel {
             _uiState.update {
                 it.copy(
                     hostRunning = true,
-                    hostPin = localServer.currentPin(),
-                    hostFingerprint = localServer.fingerprint().take(16)
+                    hostFingerprint = localServer.fingerprint().take(16),
+                    localHostId = localConfig.hostId,
+                    hostEndpoint = "https://${localConfig.advertisedHost}:${localConfig.apiPort}"
                 )
             }
-            appendLog("Host avviato con PIN ${localServer.currentPin()}")
+            appendLog("Host avviato su ${localConfig.advertisedHost}:${localConfig.apiPort}")
         }
     }
 
@@ -79,8 +85,9 @@ class MainViewModel {
             _uiState.update {
                 it.copy(
                     hostRunning = false,
-                    hostPin = "",
-                    hostFingerprint = ""
+                    hostFingerprint = "",
+                    localHostId = "",
+                    hostEndpoint = ""
                 )
             }
             appendLog("Host fermato")
@@ -114,11 +121,11 @@ class MainViewModel {
         }
     }
 
-    fun connectToHost(baseUrl: String, hostId: String, pin: String, deviceName: String) {
+    fun connectToHost(baseUrl: String, hostId: String, deviceName: String) {
         scope.launch {
-            if (hostId.isBlank() || pin.isBlank()) {
+            if (hostId.isBlank()) {
                 _uiState.update {
-                    it.copy(blockingWarning = "Inserisci hostId e PIN prima di connetterti")
+                    it.copy(blockingWarning = "Inserisci hostId prima di connetterti")
                 }
                 return@launch
             }
@@ -127,11 +134,11 @@ class MainViewModel {
                 devicePollingJob?.cancel()
                 devicePollingJob = null
                 client?.close()
+
                 val newClient = LanShareClient(baseUrl)
                 val join = newClient.join(
                     JoinRequest(
                         hostId = hostId,
-                        pin = pin,
                         deviceName = deviceName.ifBlank { "Desktop Client" },
                         devicePublicKey = "not-used-yet"
                     )
@@ -181,10 +188,10 @@ class MainViewModel {
         }
     }
 
-    fun quickConnect(host: HostAnnouncement, pin: String, deviceName: String) {
+    fun quickConnect(host: HostAnnouncement, deviceName: String) {
         val hostAddress = host.address ?: "localhost"
         val baseUrl = "https://$hostAddress:${host.apiPort}"
-        connectToHost(baseUrl, host.hostId, pin, deviceName)
+        connectToHost(baseUrl, host.hostId, deviceName)
     }
 
     fun disconnectClient() {
@@ -210,6 +217,197 @@ class MainViewModel {
     fun refreshConnectedDevices() {
         scope.launch {
             refreshConnectedDevicesInternal(showLogOnError = true)
+        }
+    }
+
+    fun createSyncPair(hostPath: String, clientPath: String, clientDeviceId: String) {
+        scope.launch {
+            val api = client
+            val token = sessionToken
+            if (api == null || token.isNullOrBlank()) {
+                appendLog("Sync pair non creata: client non connesso")
+                return@launch
+            }
+            if (hostPath.isBlank() || clientPath.isBlank() || clientDeviceId.isBlank()) {
+                appendLog("Sync pair non creata: campi mancanti")
+                return@launch
+            }
+
+            runCatching {
+                api.createSyncPair(
+                    token,
+                    SyncPairRequest(
+                        hostPath = hostPath,
+                        clientDeviceId = clientDeviceId,
+                        clientPath = clientPath
+                    )
+                )
+            }.onSuccess { pair ->
+                _uiState.update {
+                    it.copy(lastSyncPairId = pair.pairId)
+                }
+                appendLog("Sync pair creata: ${pair.pairId.take(8)}...")
+            }.onFailure { error ->
+                appendLog("Errore creazione sync pair: ${error.message}")
+            }
+        }
+    }
+
+    fun runSyncScan(pairId: String?) {
+        scope.launch {
+            val api = client
+            val token = sessionToken
+            if (api == null || token.isNullOrBlank()) {
+                appendLog("Sync scan non eseguita: client non connesso")
+                return@launch
+            }
+
+            runCatching {
+                api.syncScan(token, SyncScanRequest(pairId = pairId?.ifBlank { null }))
+            }.onSuccess { result ->
+                _uiState.update {
+                    it.copy(
+                        lastSyncDeltaCount = result.deltas.size,
+                        lastSyncConflictCount = result.conflicts.size,
+                        syncConflictItems = result.conflicts.map { conflict ->
+                            "${conflict.relativePath} -> ${conflict.conflictCopyName}"
+                        }
+                    )
+                }
+                appendLog("Sync scan completata: delta=${result.deltas.size}, conflitti=${result.conflicts.size}")
+            }.onFailure { error ->
+                appendLog("Errore sync scan: ${error.message}")
+            }
+        }
+    }
+
+    fun registerMedia(path: String) {
+        scope.launch {
+            val api = client
+            val token = sessionToken
+            if (api == null || token.isNullOrBlank()) {
+                appendLog("Media non registrato: client non connesso")
+                return@launch
+            }
+            if (path.isBlank()) {
+                appendLog("Media non registrato: percorso mancante")
+                return@launch
+            }
+
+            runCatching {
+                api.registerMedia(token, path)
+            }.onSuccess { media ->
+                _uiState.update {
+                    it.copy(
+                        lastRegisteredMediaId = media.mediaId,
+                        lastRegisteredMediaPath = media.path
+                    )
+                }
+                appendLog("Media registrato: ${media.mediaId.take(8)}...")
+            }.onFailure { error ->
+                appendLog("Errore registrazione media: ${error.message}")
+            }
+        }
+    }
+
+    fun startMediaSession(mode: PlaybackMode) {
+        scope.launch {
+            val api = client
+            val token = sessionToken
+            val mediaId = _uiState.value.lastRegisteredMediaId
+            if (api == null || token.isNullOrBlank()) {
+                appendLog("Sessione media non avviata: client non connesso")
+                return@launch
+            }
+            if (mediaId.isBlank()) {
+                appendLog("Sessione media non avviata: registra prima un media")
+                return@launch
+            }
+
+            val hostDeviceId = _uiState.value.connectedHostId.ifBlank { "host" }
+            runCatching {
+                api.createMediaSession(
+                    token,
+                    com.lanshare.core.api.model.MediaSessionRequest(
+                        mediaId = mediaId,
+                        mode = mode,
+                        hostDeviceId = hostDeviceId
+                    )
+                )
+            }.onSuccess { session ->
+                _uiState.update {
+                    it.copy(
+                        activeMediaSessionId = session.sessionId,
+                        activeMediaMode = session.mode.name
+                    )
+                }
+                appendLog("Sessione media avviata: ${session.sessionId.take(8)}...")
+            }.onFailure { error ->
+                appendLog("Errore avvio sessione media: ${error.message}")
+            }
+        }
+    }
+
+    fun startLive(includeSystemAudio: Boolean) {
+        scope.launch {
+            val api = client
+            val token = sessionToken
+            if (api == null || token.isNullOrBlank()) {
+                appendLog("Live non avviata: client non connesso")
+                return@launch
+            }
+
+            val hostDeviceId = _uiState.value.connectedHostId.ifBlank { "host" }
+            runCatching {
+                api.startLive(
+                    token,
+                    LiveStartRequest(
+                        hostDeviceId = hostDeviceId,
+                        includeSystemAudio = includeSystemAudio,
+                        targetWidth = 1280,
+                        targetHeight = 720,
+                        targetFps = 30,
+                        maxViewers = 4
+                    )
+                )
+            }.onSuccess { state ->
+                _uiState.update {
+                    it.copy(
+                        liveSessionId = state.sessionId,
+                        liveStreamUrl = state.streamUrl ?: "",
+                        liveStatus = state.status.name
+                    )
+                }
+                appendLog("Live avviata: stato=${state.status.name}")
+            }.onFailure { error ->
+                appendLog("Errore avvio live: ${error.message}")
+            }
+        }
+    }
+
+    fun stopLive() {
+        scope.launch {
+            val api = client
+            val token = sessionToken
+            val sessionId = _uiState.value.liveSessionId
+            if (api == null || token.isNullOrBlank() || sessionId.isBlank()) {
+                appendLog("Stop live ignorato: dati mancanti")
+                return@launch
+            }
+
+            runCatching {
+                api.stopLive(token, sessionId)
+            }.onSuccess { state ->
+                _uiState.update {
+                    it.copy(
+                        liveStatus = state.status.name,
+                        liveStreamUrl = ""
+                    )
+                }
+                appendLog("Live fermata: stato=${state.status.name}")
+            }.onFailure { error ->
+                appendLog("Errore stop live: ${error.message}")
+            }
         }
     }
 
@@ -461,8 +659,9 @@ class MainViewModel {
 
 data class AppUiState(
     val hostRunning: Boolean = false,
-    val hostPin: String = "",
     val hostFingerprint: String = "",
+    val localHostId: String = "",
+    val hostEndpoint: String = "",
     val autoDiscoveryEnabled: Boolean = false,
     val discoveredHosts: List<HostAnnouncement> = emptyList(),
     val connected: Boolean = false,
@@ -473,6 +672,17 @@ data class AppUiState(
     val uploadInProgress: Boolean = false,
     val blockingWarning: String? = null,
     val transferQueue: List<TransferQueueItem> = emptyList(),
+    val lastSyncPairId: String = "",
+    val lastSyncDeltaCount: Int = 0,
+    val lastSyncConflictCount: Int = 0,
+    val syncConflictItems: List<String> = emptyList(),
+    val lastRegisteredMediaId: String = "",
+    val lastRegisteredMediaPath: String = "",
+    val activeMediaSessionId: String = "",
+    val activeMediaMode: String = "",
+    val liveSessionId: String = "",
+    val liveStreamUrl: String = "",
+    val liveStatus: String = "IDLE",
     val logs: List<String> = emptyList()
 )
 

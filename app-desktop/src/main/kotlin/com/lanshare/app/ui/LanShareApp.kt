@@ -34,6 +34,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.lanshare.app.viewmodel.MainViewModel
+import com.lanshare.core.api.model.PlaybackMode
 import java.nio.file.Path
 import javax.swing.JFileChooser
 
@@ -44,8 +45,15 @@ fun LanShareApp(viewModel: MainViewModel) {
 
     var baseUrl by remember { mutableStateOf("https://localhost:8443") }
     var hostId by remember { mutableStateOf("") }
-    var pin by remember { mutableStateOf("") }
     var deviceName by remember { mutableStateOf("Desktop Client") }
+
+    var syncHostPath by remember { mutableStateOf("") }
+    var syncClientPath by remember { mutableStateOf("") }
+    var syncClientDeviceId by remember { mutableStateOf("") }
+    var syncPairIdForScan by remember { mutableStateOf("") }
+
+    var mediaPath by remember { mutableStateOf("") }
+    var includeSystemAudio by remember { mutableStateOf(true) }
 
     LaunchedEffect(state.discoveredHosts) {
         if (state.discoveredHosts.size == 1) {
@@ -101,8 +109,20 @@ fun LanShareApp(viewModel: MainViewModel) {
                     )
                 }
 
-                Text("PIN: ${if (state.hostPin.isBlank()) "-" else state.hostPin}")
                 Text("Fingerprint: ${if (state.hostFingerprint.isBlank()) "-" else state.hostFingerprint}")
+                if (state.hostRunning) {
+                    Text("Host ID locale: ${state.localHostId.take(8)}...")
+                    Text("Endpoint locale: ${state.hostEndpoint}")
+                    OutlinedButton(
+                        onClick = {
+                            hostId = state.localHostId
+                            baseUrl = state.hostEndpoint
+                        },
+                        enabled = state.localHostId.isNotBlank() && state.hostEndpoint.isNotBlank()
+                    ) {
+                        Text("Usa Host Locale")
+                    }
+                }
                 Text("Host trovati: ${state.discoveredHosts.size}")
 
                 state.discoveredHosts.forEach { host ->
@@ -132,7 +152,7 @@ fun LanShareApp(viewModel: MainViewModel) {
                                     hostId = host.hostId
                                     val hostAddress = host.address ?: "localhost"
                                     baseUrl = "https://$hostAddress:${host.apiPort}"
-                                    viewModel.quickConnect(host, pin, deviceName)
+                                    viewModel.quickConnect(host, deviceName)
                                 }
                             ) {
                                 Text("Connetti")
@@ -161,12 +181,6 @@ fun LanShareApp(viewModel: MainViewModel) {
                     label = { Text("Host ID") }
                 )
                 OutlinedTextField(
-                    value = pin,
-                    onValueChange = { pin = it },
-                    modifier = Modifier.width(200.dp),
-                    label = { Text("PIN") }
-                )
-                OutlinedTextField(
                     value = deviceName,
                     onValueChange = { deviceName = it },
                     modifier = Modifier.fillMaxWidth(),
@@ -179,7 +193,7 @@ fun LanShareApp(viewModel: MainViewModel) {
                             Text("Disconnetti")
                         }
                     } else {
-                        Button(onClick = { viewModel.connectToHost(baseUrl, hostId, pin, deviceName) }) {
+                        Button(onClick = { viewModel.connectToHost(baseUrl, hostId, deviceName) }) {
                             Text("Connetti")
                         }
                     }
@@ -221,6 +235,122 @@ fun LanShareApp(viewModel: MainViewModel) {
                     TextButton(onClick = { viewModel.clearWarning() }) {
                         Text("Chiudi")
                     }
+                }
+            }
+        }
+
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Sync Cartelle", fontWeight = FontWeight.SemiBold)
+
+                OutlinedTextField(
+                    value = syncHostPath,
+                    onValueChange = { syncHostPath = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Percorso host") }
+                )
+                OutlinedTextField(
+                    value = syncClientPath,
+                    onValueChange = { syncClientPath = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Percorso client") }
+                )
+                OutlinedTextField(
+                    value = syncClientDeviceId,
+                    onValueChange = { syncClientDeviceId = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Client device ID") }
+                )
+                OutlinedTextField(
+                    value = syncPairIdForScan,
+                    onValueChange = { syncPairIdForScan = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Pair ID per scan (opzionale)") }
+                )
+
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(onClick = {
+                        viewModel.createSyncPair(syncHostPath, syncClientPath, syncClientDeviceId)
+                    }) {
+                        Text("Crea Pair")
+                    }
+
+                    OutlinedButton(onClick = {
+                        viewModel.runSyncScan(syncPairIdForScan)
+                    }) {
+                        Text("Esegui Scan")
+                    }
+                }
+
+                Text("Ultimo Pair ID: ${state.lastSyncPairId.ifBlank { "-" }}")
+                Text("Delta: ${state.lastSyncDeltaCount} - Conflitti: ${state.lastSyncConflictCount}")
+                state.syncConflictItems.take(5).forEach { item ->
+                    Text(item)
+                }
+            }
+        }
+
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Media & Live", fontWeight = FontWeight.SemiBold)
+
+                OutlinedTextField(
+                    value = mediaPath,
+                    onValueChange = { mediaPath = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Percorso file video") }
+                )
+
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(onClick = {
+                        val selected = pickSingleFileFromDialog()
+                        if (selected != null) {
+                            mediaPath = selected.toString()
+                        }
+                    }) {
+                        Text("Sfoglia")
+                    }
+
+                    OutlinedButton(onClick = { viewModel.registerMedia(mediaPath) }) {
+                        Text("Registra Media")
+                    }
+                }
+
+                Text("Media ID: ${state.lastRegisteredMediaId.ifBlank { "-" }}")
+
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(onClick = { viewModel.startMediaSession(PlaybackMode.HOST_SYNC) }) {
+                        Text("Sessione HOST_SYNC")
+                    }
+
+                    OutlinedButton(onClick = { viewModel.startMediaSession(PlaybackMode.INDEPENDENT) }) {
+                        Text("Sessione INDEPENDENT")
+                    }
+                }
+
+                Text("Sessione media: ${state.activeMediaSessionId.ifBlank { "-" }} (${state.activeMediaMode.ifBlank { "-" }})")
+
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Audio sistema live")
+                    Switch(
+                        checked = includeSystemAudio,
+                        onCheckedChange = { includeSystemAudio = it }
+                    )
+                }
+
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(onClick = { viewModel.startLive(includeSystemAudio) }) {
+                        Text("Avvia Live")
+                    }
+
+                    OutlinedButton(onClick = { viewModel.stopLive() }) {
+                        Text("Ferma Live")
+                    }
+                }
+
+                Text("Live stato: ${state.liveStatus}")
+                if (state.liveStreamUrl.isNotBlank()) {
+                    Text("Stream URL: ${state.liveStreamUrl}")
                 }
             }
         }
@@ -354,4 +484,18 @@ private fun pickFilesOrDirectoriesFromDialog(): List<Path> {
     }
 
     return selected.map { it.toPath() }
+}
+
+private fun pickSingleFileFromDialog(): Path? {
+    val chooser = JFileChooser().apply {
+        fileSelectionMode = JFileChooser.FILES_ONLY
+        isMultiSelectionEnabled = false
+        dialogTitle = "Seleziona file video"
+    }
+
+    val result = chooser.showOpenDialog(null)
+    if (result != JFileChooser.APPROVE_OPTION) {
+        return null
+    }
+    return chooser.selectedFile?.toPath()
 }

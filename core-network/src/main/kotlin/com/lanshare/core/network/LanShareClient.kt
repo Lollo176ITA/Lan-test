@@ -5,6 +5,17 @@ import com.lanshare.core.api.model.CreateTransferRequest
 import com.lanshare.core.api.model.DeviceInfo
 import com.lanshare.core.api.model.JoinRequest
 import com.lanshare.core.api.model.JoinResponse
+import com.lanshare.core.api.model.LiveSessionState
+import com.lanshare.core.api.model.LiveStartRequest
+import com.lanshare.core.api.model.LiveStopRequest
+import com.lanshare.core.api.model.MediaRegisterRequest
+import com.lanshare.core.api.model.MediaRegisterResponse
+import com.lanshare.core.api.model.MediaSession
+import com.lanshare.core.api.model.MediaSessionRequest
+import com.lanshare.core.api.model.SyncPair
+import com.lanshare.core.api.model.SyncPairRequest
+import com.lanshare.core.api.model.SyncScanRequest
+import com.lanshare.core.api.model.SyncScanResponse
 import com.lanshare.core.api.model.TransferManifest
 import com.lanshare.core.api.model.TransferResume
 import io.ktor.client.HttpClient
@@ -91,6 +102,48 @@ class LanShareClient(
     suspend fun completeTransfer(token: String, transferId: String): CompleteTransferResponse {
         return client.post("/api/v1/transfers/$transferId/complete") {
             bearerAuth(token)
+        }.body()
+    }
+
+    suspend fun createSyncPair(token: String, request: SyncPairRequest): SyncPair {
+        return client.post("/api/v1/sync/pairs") {
+            bearerAuth(token)
+            setBody(request)
+        }.body()
+    }
+
+    suspend fun syncScan(token: String, request: SyncScanRequest = SyncScanRequest()): SyncScanResponse {
+        return client.post("/api/v1/sync/scan") {
+            bearerAuth(token)
+            setBody(request)
+        }.body()
+    }
+
+    suspend fun registerMedia(token: String, path: String): MediaRegisterResponse {
+        return client.post("/api/v1/media/register") {
+            bearerAuth(token)
+            setBody(MediaRegisterRequest(path))
+        }.body()
+    }
+
+    suspend fun createMediaSession(token: String, request: MediaSessionRequest): MediaSession {
+        return client.post("/api/v1/media/sessions") {
+            bearerAuth(token)
+            setBody(request)
+        }.body()
+    }
+
+    suspend fun startLive(token: String, request: LiveStartRequest): LiveSessionState {
+        return client.post("/api/v1/live/start") {
+            bearerAuth(token)
+            setBody(request)
+        }.body()
+    }
+
+    suspend fun stopLive(token: String, sessionId: String): LiveSessionState {
+        return client.post("/api/v1/live/stop") {
+            bearerAuth(token)
+            setBody(LiveStopRequest(sessionId))
         }.body()
     }
 

@@ -10,11 +10,11 @@ LanShare must work in LAN-only mode without mandatory cloud dependencies.
 Security model includes:
 
 - self-signed TLS certificate generated on first host run
-- 6-digit room PIN regenerated each host startup
+- no PIN requirement for LAN join
 - TOFU fingerprint check on client side
 
 ## Consequences
 
 - Better security than plain local HTTP.
-- Pairing friction remains low for LAN users.
+- Zero-friction onboarding for LAN users.
 - Fingerprint mismatch blocks connection and requires user intervention.

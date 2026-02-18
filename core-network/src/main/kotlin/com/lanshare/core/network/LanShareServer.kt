@@ -28,7 +28,6 @@ class LanShareServer(
 
     private val dataRoot = config.storageRoot
     private val tlsMaterial = TlsMaterialProvider(dataRoot.resolve("security"), config.hostName).loadOrCreate()
-    private val pinManager = PinManager()
 
     private val capabilities = CapabilitySet(
         fileTransfer = true,
@@ -74,7 +73,6 @@ class LanShareServer(
             config = config,
             json = json,
             tlsMaterial = tlsMaterial,
-            pinManager = pinManager,
             deviceRegistry = deviceRegistry,
             trustedHostStore = trustedHostStore,
             transferCoordinator = transferCoordinator,
@@ -120,10 +118,9 @@ class LanShareServer(
         }
 
         logger.info(
-            "LanShare server avviato su https://{}:{} PIN={} fingerprint={}...",
+            "LanShare server avviato su https://{}:{} fingerprint={}...",
             config.advertisedHost,
             config.apiPort,
-            pinManager.currentPin(),
             tlsMaterial.fingerprint.take(12)
         )
     }
@@ -133,8 +130,6 @@ class LanShareServer(
         server = null
         mdnsPublisher.close()
     }
-
-    fun currentPin(): String = pinManager.currentPin()
 
     fun fingerprint(): String = tlsMaterial.fingerprint
 

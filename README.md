@@ -4,20 +4,24 @@ LanShare Desktop is a LAN-only desktop application for macOS, Windows, and Linux
 It provides:
 
 - automatic host discovery on LAN
+- host locale pubblicato con IP LAN auto-rilevato (non localhost)
 - optional auto-discovery refresh every 5s
-- secure pairing with PIN + TLS
+- quick LAN join senza PIN, con TLS + fingerprint TOFU
 - drag-and-drop file and folder sharing with resume
 - manual file/folder picker, queue cleanup, retry failed uploads
 - connected devices panel with auto-refresh
+- UI per sync pair/scan, registrazione media e controlli live base
 - host/client folder synchronization with conflict copies
 - video file streaming and synchronized playback mode
 - live screen + system audio streaming (planned in M2 hardening)
+
+Security note: LAN join is PIN-less by design. Trust is enforced by TLS + TOFU fingerprint checks.
 
 ## Project Layout
 
 - `app-desktop`: Compose Desktop UI
 - `core-api`: shared API contracts and event models
-- `core-network`: Ktor HTTPS/WSS server, discovery, pairing and API routes
+- `core-network`: Ktor HTTPS/WSS server, discovery, trust model and API routes
 - `core-transfer`: chunked file transfer and resume logic
 - `core-sync`: folder sync indexing and conflict detection
 - `core-media`: media session and live streaming orchestration

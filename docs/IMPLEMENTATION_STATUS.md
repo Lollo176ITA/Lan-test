@@ -4,12 +4,12 @@
 
 - Multi-module Kotlin/Gradle project with Compose Desktop app.
 - Shared API contracts for all planned endpoints/events.
-- HTTPS/WSS server with join flow (PIN validation), device list, events stream.
+- HTTPS/WSS server with LAN join flow (TLS + TOFU fingerprint), device list, events stream.
 - Transfer API with chunk upload/download/resume/complete and hash verification.
 - Sync API with host-client pair registration and conflict detection.
 - Media registration, byte-range media file streaming, playback sessions.
 - Live session lifecycle endpoints and capability checks.
-- Desktop UI in Italian with host controls, client join form, drag-and-drop zone, transfer queue.
+- Desktop UI in Italian with auto-discovery, quick connect, drag-and-drop/picker upload, queue controls, sync/media/live panels.
 - Packaging/update/ADR docs scaffold.
 
 ## Remaining hardening work (M2+)
