@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="it">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LanShare Light App Page</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <script src="https://mcp.figma.com/mcp/html-to-design/capture.js" async></script>
+    <style>
+      :root {
+        --md-primary: #006b66;
+        --md-on-primary: #ffffff;
+        --md-primary-container: #9cf1ea;
+        --md-on-primary-container: #00201e;
+        --md-secondary: #4a635f;
+        --md-surface: #f4fbf9;
+        --md-surface-2: #e8f2ef;
+        --md-surface-3: #dde9e5;
+        --md-outline: #6f7977;
+        --md-outline-variant: #bec9c6;
+        --md-on-surface: #161d1c;
+        --md-on-surface-variant: #3f4947;
+        --shadow-sm: 0 2px 6px rgba(10, 25, 23, 0.08);
+        --shadow-md: 0 12px 30px rgba(10, 25, 23, 0.12);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: "Manrope", "Segoe UI", sans-serif;
+        color: var(--md-on-surface);
+        background:
+          radial-gradient(circle at 15% 20%, #d1f4ef 0%, rgba(209, 244, 239, 0) 38%),
+          radial-gradient(circle at 90% 0%, #dceff8 0%, rgba(220, 239, 248, 0) 32%),
+          linear-gradient(160deg, #f9fdfc 0%, #eef7f4 100%);
+        min-height: 100vh;
+      }
+
+      .wrap {
+        max-width: 1060px;
+        margin: 0 auto;
+        padding: 24px;
+      }
+
+      .shell {
+        border: 1px solid var(--md-outline-variant);
+        border-radius: 28px;
+        background: rgba(255, 255, 255, 0.82);
+        backdrop-filter: blur(4px);
+        box-shadow: var(--shadow-md);
+        overflow: hidden;
+      }
+
+      .topbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 18px 22px;
+        background: linear-gradient(90deg, #f6fdfa 0%, #edf8f6 100%);
+        border-bottom: 1px solid var(--md-outline-variant);
+      }
+
+      .brand {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+      }
+
+      .dot {
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        background: var(--md-primary);
+        box-shadow: 0 0 0 8px rgba(0, 107, 102, 0.18);
+      }
+
+      h1 {
+        margin: 0;
+        font-size: 19px;
+        line-height: 1.2;
+        font-weight: 800;
+        letter-spacing: 0.1px;
+      }
+
+      .sub {
+        margin: 2px 0 0;
+        color: var(--md-on-surface-variant);
+        font-size: 12px;
+      }
+
+      .status {
+        border-radius: 999px;
+        border: 1px solid #8fb7b0;
+        color: #084540;
+        background: #d9f8f3;
+        padding: 8px 12px;
+        font-weight: 700;
+        font-size: 12px;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: 1.1fr 0.9fr;
+        gap: 18px;
+        padding: 18px;
+      }
+
+      .card {
+        border-radius: 20px;
+        border: 1px solid var(--md-outline-variant);
+        background: linear-gradient(180deg, #f9fefd 0%, #f1f8f5 100%);
+        padding: 18px;
+        box-shadow: var(--shadow-sm);
+      }
+
+      .card h2 {
+        margin: 0 0 14px;
+        font-size: 15px;
+      }
+
+      .actions {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+
+      .btn {
+        height: 40px;
+        border-radius: 999px;
+        padding: 0 16px;
+        font-weight: 700;
+        border: none;
+        cursor: default;
+        font-family: inherit;
+      }
+
+      .btn-primary {
+        background: var(--md-primary);
+        color: var(--md-on-primary);
+      }
+
+      .btn-outline {
+        background: transparent;
+        color: var(--md-primary);
+        border: 1px solid #7f9894;
+      }
+
+      .row {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        margin: 12px 0;
+      }
+
+      .label {
+        font-size: 12px;
+        font-weight: 700;
+        color: var(--md-on-surface-variant);
+      }
+
+      .field {
+        height: 42px;
+        border: 1px solid var(--md-outline-variant);
+        border-radius: 12px;
+        background: #fcfffe;
+        display: flex;
+        align-items: center;
+        padding: 0 12px;
+        font-size: 13px;
+        color: #344;
+      }
+
+      .list {
+        margin-top: 8px;
+        display: flex;
+        flex-direction: column;
+        gap: 9px;
+      }
+
+      .device {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-radius: 14px;
+        border: 1px solid #cad8d5;
+        background: #f9fdfc;
+        padding: 12px;
+      }
+
+      .device-name {
+        font-size: 13px;
+        font-weight: 700;
+      }
+
+      .device-meta {
+        font-size: 12px;
+        color: var(--md-on-surface-variant);
+      }
+
+      .pill {
+        font-size: 11px;
+        font-weight: 700;
+        border-radius: 999px;
+        padding: 6px 9px;
+        border: 1px solid #9eb7b2;
+        color: #315955;
+        background: #e7f2ef;
+      }
+
+      .foot {
+        border-top: 1px solid var(--md-outline-variant);
+        padding: 12px 18px 18px;
+        display: flex;
+        justify-content: space-between;
+        gap: 8px;
+        color: #405350;
+        font-size: 12px;
+      }
+
+      @media (max-width: 900px) {
+        .grid {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <main class="shell">
+        <header class="topbar">
+          <div class="brand">
+            <span class="dot"></span>
+            <div>
+              <h1>LanShare Light</h1>
+              <p class="sub">UI più leggera, Material style, focus su task rapidi</p>
+            </div>
+          </div>
+          <span class="status">Host online</span>
+        </header>
+
+        <section class="grid">
+          <article class="card">
+            <h2>Connessione rapida</h2>
+            <div class="actions">
+              <button class="btn btn-primary">Avvia Host</button>
+              <button class="btn btn-outline">Discovery LAN</button>
+            </div>
+
+            <div class="row">
+              <div class="label">Endpoint</div>
+              <div class="field">https://192.168.1.24:8443</div>
+            </div>
+            <div class="row">
+              <div class="label">Nome dispositivo</div>
+              <div class="field">Desktop Client</div>
+            </div>
+            <div class="row">
+              <div class="label">Stato coda</div>
+              <div class="field">2 file in attesa - nessun errore</div>
+            </div>
+          </article>
+
+          <aside class="card">
+            <h2>Dispositivi trovati</h2>
+            <div class="list">
+              <div class="device">
+                <div>
+                  <div class="device-name">Studio-Mac</div>
+                  <div class="device-meta">192.168.1.12 - id: a4f2...</div>
+                </div>
+                <span class="pill">Pronto</span>
+              </div>
+              <div class="device">
+                <div>
+                  <div class="device-name">Pixel-Tablet</div>
+                  <div class="device-meta">192.168.1.33 - id: d90b...</div>
+                </div>
+                <span class="pill">Connesso</span>
+              </div>
+              <div class="device">
+                <div>
+                  <div class="device-name">Laptop-Ufficio</div>
+                  <div class="device-meta">192.168.1.48 - id: 6f1c...</div>
+                </div>
+                <span class="pill">Sync attivo</span>
+              </div>
+            </div>
+          </aside>
+        </section>
+
+        <footer class="foot">
+          <span>Design target: semplice, veloce, senza elementi pesanti</span>
+          <span>Material-inspired layout</span>
+        </footer>
+      </main>
+    </div>
+  </body>
+</html>

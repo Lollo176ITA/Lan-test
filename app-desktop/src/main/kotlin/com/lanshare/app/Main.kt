@@ -1,10 +1,10 @@
 package com.lanshare.app
 
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.remember
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import com.lanshare.app.ui.LanShareApp
+import com.lanshare.app.ui.theme.LanShareTheme
 import com.lanshare.app.viewmodel.MainViewModel
 
 fun main(args: Array<String>) {
@@ -23,7 +23,7 @@ fun main(args: Array<String>) {
             },
             title = "LanShare Desktop"
         ) {
-            MaterialTheme {
+            LanShareTheme {
                 LanShareApp(viewModel)
             }
         }

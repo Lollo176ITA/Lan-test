@@ -26,6 +26,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import java.net.URI
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.UUID
@@ -122,9 +123,10 @@ class MainViewModel {
 
     fun connectToHost(baseUrl: String, hostId: String, deviceName: String) {
         scope.launch {
-            if (baseUrl.isBlank()) {
+            val normalizedBaseUrl = normalizeBaseUrl(baseUrl)
+            if (normalizedBaseUrl == null) {
                 _uiState.update {
-                    it.copy(blockingWarning = "Inserisci Base URL prima di connetterti")
+                    it.copy(blockingWarning = "Base URL non valida. Usa formato host:porta o https://host:porta")
                 }
                 return@launch
             }
@@ -134,7 +136,7 @@ class MainViewModel {
                 devicePollingJob = null
                 client?.close()
 
-                val newClient = LanShareClient(baseUrl)
+                val newClient = LanShareClient(normalizedBaseUrl)
                 val join = newClient.join(
                     JoinRequest(
                         hostId = hostId.ifBlank { "auto" },
@@ -143,7 +145,7 @@ class MainViewModel {
                     )
                 )
 
-                val trustKey = hostId.ifBlank { baseUrl }
+                val trustKey = hostId.ifBlank { normalizedBaseUrl }
                 val trusted = trustedHostStore.get(trustKey)
                 if (trusted != null && trusted.fingerprint != join.hostFingerprint) {
                     _uiState.update {
@@ -168,7 +170,7 @@ class MainViewModel {
                         sessionToken = join.sessionToken,
                         blockingWarning = null,
                         connectedHostId = hostId.ifBlank { "auto" },
-                        connectedBaseUrl = baseUrl,
+                        connectedBaseUrl = normalizedBaseUrl,
                         connectedDevices = emptyList()
                     )
                 }
@@ -536,6 +538,11 @@ class MainViewModel {
         }
     }
 
+    fun clearQueue() {
+        _uiState.update { it.copy(transferQueue = emptyList()) }
+        appendLog("Coda trasferimenti svuotata")
+    }
+
     fun retryFailedQueue() {
         _uiState.update { state ->
             state.copy(
@@ -559,6 +566,10 @@ class MainViewModel {
 
     fun clearWarning() {
         _uiState.update { it.copy(blockingWarning = null) }
+    }
+
+    fun clearLogs() {
+        _uiState.update { it.copy(logs = emptyList()) }
     }
 
     fun shutdown() {
@@ -661,6 +672,30 @@ class MainViewModel {
                 }
             )
         }
+    }
+
+    private fun normalizeBaseUrl(baseUrl: String): String? {
+        val trimmed = baseUrl.trim()
+        if (trimmed.isBlank()) {
+            return null
+        }
+
+        val withScheme = if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+            trimmed
+        } else {
+            "https://$trimmed"
+        }
+
+        val normalized = withScheme.removeSuffix("/")
+        val uri = runCatching { URI(normalized) }.getOrNull() ?: return null
+        val scheme = uri.scheme?.lowercase() ?: return null
+        if (scheme != "https") {
+            return null
+        }
+        if (uri.host.isNullOrBlank()) {
+            return null
+        }
+        return normalized
     }
 }
 
